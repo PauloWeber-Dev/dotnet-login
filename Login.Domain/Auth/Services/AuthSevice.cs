@@ -1,14 +1,23 @@
-﻿using Domain.Auth.DTO;
-using Domain.Auth.Entities;
+﻿using AutoMapper;
+
+using Google.Apis.Auth;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using Newtonsoft.Json;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using AutoMapper;
-using Google.Apis.Auth;
 using System.Threading.Tasks;
+
+using Domain.Auth.DTO;
+using Login.Domain.Auth.DTO;
+using Domain.Repository.Entities;
+using Domain.Repository;
+using OtpNet;
+using Login.Domain.Helpers;
+using Login.Domain.Email;
+
 
 namespace Domain.Auth.Services;
 
@@ -17,25 +26,35 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IConfiguration _configuration;
     private readonly IMapper _mapper;
+    private readonly IEmailService _emailService;
 
-    public AuthService(IUserRepository userRepository, IConfiguration configuration, IMapper mapper)
+    public AuthService(IUserRepository userRepository, IEmailService emailService, IConfiguration configuration, IMapper mapper)
     {
         _userRepository = userRepository;
         _configuration = configuration;
         _mapper = mapper;
+        _emailService = emailService;
     }
 
     public async Task<string> RegisterAsync(RegisterUserDto dto)
     {
-        var existingUser = await _userRepository.GetByEmailAsync(dto.Email);
-        if (existingUser != null)
-            throw new Exception("Email already exists");
+        try
+        {
+            var existingUser = await _userRepository.GetByEmailAsync(dto.Email);
+            if (existingUser != null)
+                throw new Exception("Email already exists");
 
 
-        var user = _mapper.Map<User>(dto);
+            var user = _mapper.Map<User>(dto);
 
-        await _userRepository.CreateAsync(user);
-        return await GenerateJwtToken(user);
+            await _userRepository.CreateAsync(user);
+            return await GenerateJwtToken(user);
+        }
+        catch (Exception)
+        {
+
+            throw;
+        }
     }
 
     public async Task<string> LoginAsync(LoginDto dto)
@@ -43,27 +62,6 @@ public class AuthService : IAuthService
         var user = await _userRepository.GetByEmailAsync(dto.Email);
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             throw new Exception("Invalid credentials");
-
-        return await GenerateJwtToken(user);
-    }
-
-    public async Task<string> GoogleLoginAsync(string googleToken)
-    {
-        // Validate Google token (simplified, use Google.Apis.Auth in production)
-        var userInfo = await ValidateGoogleToken(googleToken);
-        var user = await _userRepository.GetByGoogleIdAsync(userInfo.Sub);
-
-        if (user == null)
-        {
-            user = new User
-            {
-                Email = userInfo.Email,
-                FirstName = userInfo.GivenName,
-                LastName = userInfo.FamilyName,
-                GoogleId = userInfo.Sub
-            };
-            await _userRepository.CreateAsync(user);
-        }
 
         return await GenerateJwtToken(user);
     }
@@ -78,8 +76,7 @@ public class AuthService : IAuthService
         user.ResetToken = token;
         user.ResetTokenExpiry = DateTime.UtcNow.AddHours(1);
         await _userRepository.UpdateAsync(user);
-
-        await SendResetEmail(user.Email, token);
+        await SendResetEmail(user);
     }
 
     public async Task ResetPasswordAsync(string token, string newPassword)
@@ -92,6 +89,7 @@ public class AuthService : IAuthService
         user.ResetToken = null;
         user.ResetTokenExpiry = null;
         await _userRepository.UpdateAsync(user);
+        
     }
 
     private async Task<string> GenerateJwtToken(User user) => await Task.Run(() =>
@@ -119,26 +117,94 @@ public class AuthService : IAuthService
                                                                        return new JwtSecurityTokenHandler().WriteToken(token);
                                                                    });
 
-    private async Task SendResetEmail(string email, string token)
+    #region Email Confirmation
+    private async Task SendResetEmail(User user)
+    {
+        string resetLink = $"{_configuration["App:BaseUrl"]}/reset-password?token={user.ResetToken}";
+        string emailBody = EmailTemplateHelper.GetResetEmailTemplate(resetLink, user);
+        _emailService.SendEmail(user, "Password Reset Request", emailBody);
+
+    }
+
+    public async Task ConfirmEmailAsync(ConfirmEmailDto dto)
+    {
+        var user = await _userRepository.GetByEmailAsync(dto.Email);
+        if (user == null || user.EmailConfirmationCode != dto.Code || user.EmailConfirmationCodeExpiry < DateTime.UtcNow)
+            throw new Exception("Confirmation token invalid or expired");
+
+        user.IsEmailConfirmed = true;
+        user.EmailConfirmationCode = null; // Clear the token after confirmation
+        await _userRepository.UpdateAsync(user);
+    }
+    #endregion
+
+    #region Facebook Login
+    public async Task<string> FacebookLoginAsync(string facebookToken)
     {
         throw new NotImplementedException();
     }
+    #endregion
 
-    private async Task<GoogleUserInfo> ValidateGoogleToken(string token)
+    #region Google Login
+
+    public async Task<string> GoogleLoginAsync(string googleToken)
     {
-        throw new NotImplementedException();
+        // Validate the Google token
+        var payload = await GoogleJsonWebSignature.ValidateAsync(googleToken);
+        if (payload == null)
+            throw new Exception("Invalid Google token");
+        // Check if user already exists
+        var user = await _userRepository.GetByGoogleIdAsync(payload.Subject);
+        if (user == null)
+        {
+            // Create a new user if not found
+            user = new User
+            {
+                FirstName = payload.GivenName,
+                LastName = payload.FamilyName,
+                Email = payload.Email,
+                GoogleId = payload.Subject
+            };
+            await _userRepository.CreateAsync(user);
+        }
+        return await GenerateJwtToken(user);
     }
 
-    public async Task<string> FacebookLoginAsync(string token)
+    #endregion
+
+    #region MFA
+    public async Task<string> EnableMfaAsync(EnableMfaDto dto)
     {
-        throw new NotImplementedException();
+        var user = await _userRepository.GetByIdAsync(dto.UserId);
+        if (user == null)
+            throw new Exception("User not found");
+        if (!user.IsEmailConfirmed)
+            throw new Exception("Email not confirmed");
+
+        var secretKey = KeyGeneration.GenerateRandomKey(20);
+        user.MfaSecretKey = Base32Encoding.ToString(secretKey);
+        await _userRepository.UpdateAsync(user);
+
+        // Gerar QR Code URL para o Google Authenticator
+        var issuer = _configuration["Jwt:Issuer"];
+        var qrCodeUrl = $"otpauth://totp/{issuer}:{user.Email}?secret={user.MfaSecretKey}&issuer={issuer}";
+        return qrCodeUrl; // Retorna URL para o cliente gerar o QR Code
     }
 
-    private record GoogleUserInfo
+    public async Task<string> VerifyMfaAsync(VerifyMfaDto dto)
     {
-        public string Sub { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string GivenName { get; set; } = string.Empty;
-        public string FamilyName { get; set; } = string.Empty;
+        var user = await _userRepository.GetByEmailAsync(dto.Email);
+        if (user == null || user.MfaSecretKey == null)
+            throw new Exception("MFA not enabled or user not found");
+
+        var totp = new Totp(Base32Encoding.ToBytes(user.MfaSecretKey));
+        if (!totp.VerifyTotp(dto.Code, out _, new VerificationWindow(2)))
+            throw new Exception("Invalid MFA code");
+
+        return await GenerateJwtToken(user);
     }
+
+
+    #endregion
 }
+

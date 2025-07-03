@@ -1,33 +1,34 @@
 using Domain.Auth;
 using Domain.Auth.DTO;
 using Domain.Auth.Services;
+using Domain.Repository;
+using Login.Domain.Email;
 using Repository.Auth;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services
-
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddAutoMapper(Assembly.Load("Login.Domain"));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "Login API", Version = "v1" });
-});
+    {
+        c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "Login API", Version = "v1" });
+    });
 builder.Services
-.AddAuthentication()
-.AddGoogle(options =>
-{
-    options.ClientId = builder.Configuration["Google:ClientId"];
-    options.ClientSecret = builder.Configuration["Google:ClientSecret"];
-}).AddFacebook(options =>
-{
-    options.AppId = builder.Configuration["Facebook:AppId"];
-    options.AppSecret = builder.Configuration["Facebook:AppSecret"];
-});
+    .AddAuthentication()
+    .AddGoogle(options =>
+    {
+        options.ClientId = builder.Configuration["Google:ClientId"];
+        options.ClientSecret = builder.Configuration["Google:ClientSecret"];
+    }).AddFacebook(options =>
+    {
+        options.AppId = builder.Configuration["Facebook:AppId"];
+        options.AppSecret = builder.Configuration["Facebook:AppSecret"];
+    });
 
 
 

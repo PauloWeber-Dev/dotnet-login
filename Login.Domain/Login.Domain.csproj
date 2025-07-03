@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UserSecretsId>c0ac6249-e520-4f50-9c5e-2ca79e41bf71</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,7 +15,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.17" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.17" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="7.7.1" />
+    <PackageReference Include="MimeKit" Version="4.13.0" />
+    <PackageReference Include="Otp.NET" Version="1.4.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.7.1" />
   </ItemGroup>
 

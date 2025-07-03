@@ -1,4 +1,5 @@
 ﻿using Domain.Auth.DTO;
+using Login.Domain.Auth.DTO;
 
 
 namespace Domain.Auth;
@@ -11,4 +12,7 @@ public interface IAuthService
     Task<string> FacebookLoginAsync(string googleToken);
     Task RequestPasswordResetAsync(string email);
     Task ResetPasswordAsync(string token, string newPassword);
+    Task ConfirmEmailAsync(ConfirmEmailDto dto);
+    Task<string> EnableMfaAsync(EnableMfaDto dto);
+    Task<string> VerifyMfaAsync(VerifyMfaDto dto);
 }
