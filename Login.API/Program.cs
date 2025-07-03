@@ -2,6 +2,7 @@ using Domain.Auth;
 using Domain.Auth.DTO;
 using Domain.Auth.Services;
 using Domain.Repository;
+using Login.Domain.Auth.DTO;
 using Login.Domain.Email;
 using Repository.Auth;
 using System.Reflection;
@@ -120,6 +121,32 @@ app.MapPost("/reset-password", async (string token, string newPassword, IAuthSer
     {
         await authService.ResetPasswordAsync(token, newPassword);
         return Results.Ok("Password reset successfully");
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+});
+
+app.MapPost("/enable-mfa", async (EnableMfaDto dto, IAuthService authService) =>
+{
+    try
+    {
+        var qrCodeUrl = await authService.EnableMfaAsync(dto);
+        return Results.Ok(new { QrCodeUrl = qrCodeUrl });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+});
+
+app.MapPost("/verify-mfa", async (VerifyMfaDto dto, IAuthService authService) =>
+{
+    try
+    {
+        var token = await authService.VerifyMfaAsync(dto);
+        return Results.Ok(new { Token = token });
     }
     catch (Exception ex)
     {
