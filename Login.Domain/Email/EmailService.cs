@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 using System.Net.Mail;
 
 
-namespace Login.Domain.Email
+namespace Domain.Email
 {
     public class EmailService : IEmailService
     {

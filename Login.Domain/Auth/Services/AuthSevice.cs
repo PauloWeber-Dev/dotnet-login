@@ -8,15 +8,14 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
-using Domain.Auth.DTO;
-using Login.Domain.Auth.DTO;
+
+using DTO.Auth;
 using Domain.Repository.Entities;
 using Domain.Repository;
 using OtpNet;
 using Login.Domain.Helpers;
-using Login.Domain.Email;
+using Domain.Email;
 
 
 namespace Domain.Auth.Services;
@@ -46,6 +45,8 @@ public class AuthService : IAuthService
 
 
             var user = _mapper.Map<User>(dto);
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
             await _userRepository.CreateAsync(user);
             return await GenerateJwtToken(user);

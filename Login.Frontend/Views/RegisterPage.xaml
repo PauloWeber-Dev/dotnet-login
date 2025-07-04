@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Login.Frontend.Views.RegisterPage"
+             Title="RegisterPage">
+    <VerticalStackLayout Spacing="20" Padding="30">
+        <Label Text="Register" FontSize="Title" HorizontalOptions="Center" />
+        <Entry Text="{Binding FirstName}" Placeholder="First Name" />
+        <Entry Text="{Binding LastName}" Placeholder="Last Name" />
+        <DatePicker Date="{Binding BirthDate}" />
+        <Entry Text="{Binding Gender}" Placeholder="Gender" />
+        <Entry Text="{Binding Email}" Placeholder="Email" />
+        <Entry Text="{Binding Password}" Placeholder="Password" IsPassword="True" />
+        <Label Text="{Binding ErrorMessage}" TextColor="Red" IsVisible="{Binding ErrorMessage.Length > 0}" />
+        <Button Text="Register" Command="{Binding RegisterCommand}" />
+        <Button Text="Back to Login" Command="{Binding GoToLoginCommand}" />
+    </VerticalStackLayout>
+</ContentPage>

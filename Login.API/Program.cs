@@ -1,9 +1,8 @@
 using Domain.Auth;
-using Domain.Auth.DTO;
+using DTO.Auth;
 using Domain.Auth.Services;
 using Domain.Repository;
-using Login.Domain.Auth.DTO;
-using Login.Domain.Email;
+using Domain.Email;
 using Repository.Auth;
 using System.Reflection;
 

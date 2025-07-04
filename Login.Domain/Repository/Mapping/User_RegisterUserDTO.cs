@@ -1,6 +1,6 @@
 ﻿
 using AutoMapper;
-using Domain.Auth.DTO;
+using DTO.Auth;
 using Domain.Repository.Entities;
 
 namespace Login.Domain.Repository.Mapping;

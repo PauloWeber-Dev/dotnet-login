@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Login.Domain\Login.Domain.csproj" />
+    <ProjectReference Include="..\Login.DTO\Login.DTO.csproj" />
     <ProjectReference Include="..\Login.Repository\Login.Repository.csproj" />
   </ItemGroup>
 

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Domain.Auth.DTO;
+namespace DTO.Auth;
 
 public record RegisterUserDto(
 string FirstName,
@@ -14,5 +14,6 @@ string Gender,
 string Email,
 string Password,
 bool? ExternalLogin = null,
-string? GoogleId = null
+string? GoogleId = null,
+string? FacebookId = null
 );

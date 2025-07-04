@@ -1,5 +1,4 @@
-﻿using Domain.Auth.DTO;
-using Login.Domain.Auth.DTO;
+﻿using DTO.Auth;
 
 
 namespace Domain.Auth;

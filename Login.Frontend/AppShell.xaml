@@ -3,13 +3,23 @@
     x:Class="Login.Frontend.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:Login.Frontend"
+    xmlns:views="clr-namespace:Login.Frontend.Views"
     Shell.FlyoutBehavior="Disabled"
     Title="Login.Frontend">
 
-    <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
-
+    <ShellContent Title="Login"
+                  ContentTemplate="{DataTemplate views:LoginPage}"
+                  Route="LoginPage" />
+    <ShellContent Title="Register"
+                  ContentTemplate="{DataTemplate views:RegisterPage}"
+                  Route="RegisterPage" />
+    <ShellContent Title="Confirm Email"
+                  ContentTemplate="{DataTemplate views:ConfirmEmailPage}"
+                  Route="ConfirmEmailPage" />
+    <ShellContent Title="Forgot Password"
+                  ContentTemplate="{DataTemplate views:ForgotPasswordPage}"
+                  Route="ForgotPasswordPage" />
+    <ShellContent Title="MFA"
+                  ContentTemplate="{DataTemplate views:MfaPage}"
+                  Route="MfaPage" />
 </Shell>

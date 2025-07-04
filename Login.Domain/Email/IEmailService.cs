@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Login.Domain.Email
+namespace Domain.Email
 {
     public interface IEmailService
     {

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Login.Frontend.Views.LoginPage"
+             Title="LoginPage">
+    <VerticalStackLayout Spacing="20" Padding="30">
+        <Label Text="Login" FontSize="Title" HorizontalOptions="Center" />
+        <Entry Text="{Binding Email}" Placeholder="Email" />
+        <Entry Text="{Binding Password}" Placeholder="Password" IsPassword="True" />
+        <Entry Text="{Binding MfaCode}" Placeholder="MFA Code" IsVisible="{Binding IsMfaRequired}" />
+        <Label Text="{Binding ErrorMessage}" TextColor="Red" IsVisible="{Binding ErrorMessage.Length > 0}" />
+        <Button Text="Login" Command="{Binding LoginCommand}" IsVisible="{Binding IsMfaRequired, Converter={StaticResource InverseBooleanConverter}}" />
+        <Button Text="Verify MFA" Command="{Binding VerifyMfaCommand}" IsVisible="{Binding IsMfaRequired}" />
+        <Button Text="Login with Google" Command="{Binding GoogleLoginCommand}" />
+        <Button Text="Register" Command="{Binding GoToRegisterCommand}" />
+        <Button Text="Forgot Password" Command="{Binding ForgotPasswordCommand}" />
+    </VerticalStackLayout>
+</ContentPage>
