@@ -1,8 +1,8 @@
 ﻿using Domain.Repository.Entities;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Configuration;
 using MimeKit;
-using Newtonsoft.Json.Linq;
-using System.Net.Mail;
 
 
 namespace Domain.Email
@@ -16,18 +16,23 @@ namespace Domain.Email
         }
         public void SendEmail(User user, string subject, string body)
         {
-            var message = new MailMessage();
-            message.From = new MailAddress(_configuration["Smtp:Sender"]!, "Auth API");
-            message.To.Add(new MailAddress(user.Email!, @"{user.FirstName} {user.LastName}"));
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(_configuration["EmailSettings:SenderName"]!,_configuration["EmailSettings:SenderEmail"]!));
+            message.To.Add(new MailboxAddress(@"{user.FirstName} {user.LastName}", user.Email!));
             
             message.Subject =subject;
-            message.Body = body;
-            message.IsBodyHtml = true;
+            message.Body = new TextPart("html")
+            {
+                Text = body
+            };
 
-            using var client = new SmtpClient(_configuration["Smtp:Host"]!, int.Parse(_configuration["Smtp:Port"]!));
-            client.EnableSsl = bool.Parse(_configuration["Smtp:EnableSsl"]!);
-            client.Credentials = new System.Net.NetworkCredential(_configuration["Smtp:Username"]!, _configuration["Smtp:Password"]!);
-            client.SendAsync(message, Guid.NewGuid().ToString());
+            using (var client = new SmtpClient())
+            {
+                client.Connect("smtp.gmail.com", 587, SecureSocketOptions.StartTls);
+                client.Authenticate(_configuration["EmailSettings:SenderEmail"]!, _configuration["EmailSettings:SenderPassword"]!);
+                client.Send(message);
+                client.Disconnect(true);
+            }
         }
     }
 }

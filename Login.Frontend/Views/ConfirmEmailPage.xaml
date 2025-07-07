@@ -2,11 +2,11 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Login.Frontend.Views.ConfirmEmailPage"
-             Title="ConfirmEmailPage">
+             Title="Confirme seu email">
     <VerticalStackLayout Spacing="20" Padding="30">
-        <Label Text="Confirm Email" FontSize="Title" HorizontalOptions="Center" />
+        <Label Text="Confirme o Email" FontSize="Title" HorizontalOptions="Center" />
         <Entry Text="{Binding Email}" Placeholder="Email" />
-        <Entry Text="{Binding Code}" Placeholder="Confirmation Code" />
+        <Entry Text="{Binding Code}" Placeholder="Codigo de Confirmação" />
         <Label Text="{Binding ErrorMessage}" TextColor="Red" IsVisible="{Binding ErrorMessage.Length > 0}" />
         <Button Text="Confirm" Command="{Binding ConfirmEmailCommand}" />
     </VerticalStackLayout>

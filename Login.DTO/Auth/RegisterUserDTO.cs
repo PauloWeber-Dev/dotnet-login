@@ -13,6 +13,7 @@ DateTime BirthDate,
 string Gender,
 string Email,
 string Password,
+string ConfirmPassword,
 bool? ExternalLogin = null,
 string? GoogleId = null,
 string? FacebookId = null

@@ -41,15 +41,25 @@ public class AuthService : IAuthService
         {
             var existingUser = await _userRepository.GetByEmailAsync(dto.Email);
             if (existingUser != null)
-                throw new Exception("Email already exists");
+                throw new Exception("Email existe");
 
 
             var user = _mapper.Map<User>(dto);
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
+            user.EmailConfirmationCode = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
             await _userRepository.CreateAsync(user);
-            return await GenerateJwtToken(user);
+
+            string confirmationLink = $"{_configuration["App:BaseUrl"]}/confirm-email?email={Uri.EscapeDataString(user.Email)}&code={Uri.EscapeDataString(user.EmailConfirmationCode)}";
+
+            string emailContent = EmailTemplateHelper.GetConfirmEmailTemplate(confirmationLink, user);
+
+            _emailService.SendEmail(user, "Confirme seu email", emailContent);
+
+            return "Operação realizada com sucesso. Um email de confirmação foi enviado para o seu endereço de email.";
+
         }
         catch (Exception)
         {
@@ -71,7 +81,7 @@ public class AuthService : IAuthService
     {
         var user = await _userRepository.GetByEmailAsync(email);
         if (user == null)
-            return; // Silently fail to avoid email enumeration
+            return; 
 
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         user.ResetToken = token;
@@ -127,7 +137,7 @@ public class AuthService : IAuthService
 
     }
 
-    public async Task ConfirmEmailAsync(ConfirmEmailDto dto)
+    public async Task <bool> ConfirmEmailAsync(ConfirmEmailDto dto)
     {
         var user = await _userRepository.GetByEmailAsync(dto.Email);
         if (user == null || user.EmailConfirmationCode != dto.Code || user.EmailConfirmationCodeExpiry < DateTime.UtcNow)
@@ -136,6 +146,7 @@ public class AuthService : IAuthService
         user.IsEmailConfirmed = true;
         user.EmailConfirmationCode = null; // Clear the token after confirmation
         await _userRepository.UpdateAsync(user);
+        return user.IsEmailConfirmed;
     }
     #endregion
 
@@ -204,6 +215,12 @@ public class AuthService : IAuthService
 
         return await GenerateJwtToken(user);
     }
+
+    public async Task<string> GetLatestTOU() => await Task.Run(() => { return "Terms of Use content goes here. This should be fetched from a database or a file."; });
+
+
+    public async Task<string> GetLatestPP() => await Task.Run(() => {return "Privacy Policy content goes here. This should be fetched from a database or a file."; });
+      
 
 
     #endregion

@@ -53,8 +53,21 @@ app.MapPost("/register", async (RegisterUserDto dto, IAuthService authService) =
 {
     try
     {
-        var token = await authService.RegisterAsync(dto);
-        return Results.Ok(new { Token = token });
+        var message = await authService.RegisterAsync(dto);
+        return Results.Ok(new { message });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+});
+
+app.MapPost("/confirm-email", async (ConfirmEmailDto dto, IAuthService authService) =>
+{
+    try
+    {
+        var message = await authService.ConfirmEmailAsync(dto);
+        return Results.Ok(new { message });
     }
     catch (Exception ex)
     {

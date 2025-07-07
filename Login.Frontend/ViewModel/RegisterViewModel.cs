@@ -3,12 +3,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DTO.Auth;
 using Login.Frontend.Services;
+using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Login.Frontend.ViewModel
 {
@@ -35,7 +32,17 @@ namespace Login.Frontend.ViewModel
         public string password = string.Empty;
 
         [ObservableProperty]
+        private string confirmPassword = string.Empty;
+        
+        [ObservableProperty]
         public string errorMessage = string.Empty;
+
+        public ObservableCollection<string> GenderOptions { get; } = new ObservableCollection<string>
+    {
+        "Masculino",
+        "Feminino",
+        "Outros/Prefiro não informar"
+    };
 
         public RegisterViewModel(IAuthService authService)
         {
@@ -48,7 +55,32 @@ namespace Login.Frontend.ViewModel
             try
             {
                 ErrorMessage = string.Empty;
-                var dto = new RegisterUserDto(FirstName, LastName, BirthDate, Gender, Email,BCrypt.Net.BCrypt.HashPassword(Password));
+                ErrorMessage = string.Empty;
+
+                // Validar email
+                if (!IsValidEmail(Email))
+                {
+                    ErrorMessage = "Por favor, insira um email válido.";
+                    return;
+                }
+
+                // Validar senhas
+                if (Password != ConfirmPassword)
+                {
+                    ErrorMessage = "As senhas não coincidem.";
+                    return;
+                }
+
+                // Validar se Gender foi selecionado
+                if (string.IsNullOrEmpty(Gender))
+                {
+                    ErrorMessage = "Por favor, selecione um gênero.";
+                    return;
+                }
+
+                // Hashear a senha antes de enviar
+                var passwordHash = BCrypt.Net.BCrypt.HashPassword(Password);
+                var dto = new RegisterUserDto(FirstName, LastName, BirthDate, Gender, Email,BCrypt.Net.BCrypt.HashPassword(Password), BCrypt.Net.BCrypt.HashPassword(ConfirmPassword));
                 var message = await _authService.RegisterAsync(dto);
                 await Shell.Current.DisplayAlert("Success", message, "OK");
                 await Shell.Current.GoToAsync("//ConfirmEmailPage");
@@ -63,6 +95,27 @@ namespace Login.Frontend.ViewModel
         private async Task GoToLoginAsync()
         {
             await Shell.Current.GoToAsync("//LoginPage");
+        }
+
+        [RelayCommand]
+        private async Task GoToTermsAsync()
+        {
+            await Shell.Current.GoToAsync("TermsOfUsePage");
+        }
+
+        [RelayCommand]
+        private async Task GoToPrivacyPolicyAsync()
+        {
+            await Shell.Current.GoToAsync("PrivacyPolicyPage");
+        }
+        private bool IsValidEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return false;
+
+            // Expressão regular para validar email
+            var regex = new Regex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+            return regex.IsMatch(email);
         }
     }
 }

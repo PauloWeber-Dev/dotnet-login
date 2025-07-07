@@ -2,17 +2,45 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Login.Frontend.Views.RegisterPage"
-             Title="RegisterPage">
+             Title="Registro">
     <VerticalStackLayout Spacing="20" Padding="30">
-        <Label Text="Register" FontSize="Title" HorizontalOptions="Center" />
-        <Entry Text="{Binding FirstName}" Placeholder="First Name" />
-        <Entry Text="{Binding LastName}" Placeholder="Last Name" />
-        <DatePicker Date="{Binding BirthDate}" />
-        <Entry Text="{Binding Gender}" Placeholder="Gender" />
-        <Entry Text="{Binding Email}" Placeholder="Email" />
-        <Entry Text="{Binding Password}" Placeholder="Password" IsPassword="True" />
+        <Label Text="Efetue o seu registro" FontSize="Title" HorizontalOptions="Center" />
+        <Entry Text="{Binding FirstName}" Placeholder="Nome" />
+        <Entry Text="{Binding LastName}" Placeholder="Sobrenome" />
+        <HorizontalStackLayout Spacing="5">
+            <Label Text="Data de Nascimento:" VerticalOptions="Center"/>
+            <DatePicker Date="{Binding BirthDate}" Format="dd/MM/yyyy" />
+        </HorizontalStackLayout>
+        <Picker Title="Selecione o gênero"
+                ItemsSource="{Binding GenderOptions}"
+                SelectedItem="{Binding Gender}" />
+        <Entry Text="{Binding Email}" Placeholder="Email" Keyboard="Email" />
+        <Entry Text="{Binding Password}" Placeholder="Senha" IsPassword="True" />
+        <Entry Text="{Binding ConfirmPassword}" Placeholder="Confirmar Senha" IsPassword="True" />
+        <HorizontalStackLayout Spacing="5">
+            <CheckBox IsChecked="{Binding AcceptedTerms}" />
+            <Label LineBreakMode="WordWrap">
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="Eu li e aceito os" />
+                        <Span Text="&#10;" />
+                        <Span Text="Termos de Uso" TextColor="Blue" TextDecorations="Underline">
+                            <Span.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding GoToTermsCommand}" />
+                            </Span.GestureRecognizers>
+                        </Span>
+                        <Span Text=" e a " />
+                        <Span Text="Política de Privacidade" TextColor="Blue" TextDecorations="Underline">
+                            <Span.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding GoToPrivacyPolicyCommand}" />
+                            </Span.GestureRecognizers>
+                        </Span>
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+        </HorizontalStackLayout>
         <Label Text="{Binding ErrorMessage}" TextColor="Red" IsVisible="{Binding ErrorMessage.Length > 0}" />
-        <Button Text="Register" Command="{Binding RegisterCommand}" />
-        <Button Text="Back to Login" Command="{Binding GoToLoginCommand}" />
+        <Button Text="Registrar" Command="{Binding RegisterCommand}" />
+        <Button Text="Voltar para Login" Command="{Binding GoToLoginCommand}" />
     </VerticalStackLayout>
 </ContentPage>
