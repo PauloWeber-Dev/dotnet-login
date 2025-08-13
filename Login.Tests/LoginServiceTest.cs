@@ -1,73 +1,103 @@
-using System;
-using System.Threading.Tasks;
 using AutoMapper;
 using Domain.Auth;
 using Domain.Auth.Services;
-using Domain.Repository;
 using Domain.Email;
-using DTO.Auth;
-using Moq;
-using Xunit;
+using Domain.Repository;
 using Domain.Repository.Entities;
+using DTO.Auth;
+using Login.Repository;
+using Repository.Auth;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Moq;
+
+using System;
+using System.Threading.Tasks;
+using Xunit;
 
 namespace Login.Tests;
-
+[Collection("LoginTests")]
 public class AuthServiceTests
 {
-    private readonly Mock<IUserRepository> _userRepositoryMock;
-    private readonly Mock<IEmailService> _emailServiceMock;
-    private readonly Mock<IMapper> _mapperMock;
+    private readonly LoginDbContext _dbContext;
+    private readonly IUserRepository _userRepositoryMock;
+    private readonly IEmailService _emailServiceMock;
+    private readonly IMapper _mapper;
     private readonly Mock<IConfiguration> _configurationMock;
     private readonly IAuthService _authService;
-
+    private readonly RegisterUserDto _registerUserDtoMock = new RegisterUserDto("First", "Last", DateTime.UtcNow.AddYears(-30), "any", "firstlast@example.com", "Password123", "Password123");
+    private LoginDbContext GetInMemoryDbContext()
+    {
+        // Create a unique database name for each test to avoid conflicts
+        var options = new DbContextOptionsBuilder<LoginDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .EnableSensitiveDataLogging()
+            .Options;
+        return new LoginDbContext(options);
+    }
     public AuthServiceTests()
     {
-        _userRepositoryMock = new Mock<IUserRepository>();
-        _emailServiceMock = new Mock<IEmailService>();
-        _mapperMock = new Mock<IMapper>();
+        _dbContext = GetInMemoryDbContext();
+        _userRepositoryMock = new UserRepositoryEF(_dbContext);
         _configurationMock = new Mock<IConfiguration>();
+        var config = new MapperConfiguration(cfg =>
+        {
+            cfg.CreateMap<User, RegisterUserDto>().ReverseMap();
+        });
+        _mapper = config.CreateMapper();
 
-        // Mock configuration values (e.g., for JWT, Google, or Facebook settings)
-        _configurationMock.Setup(c => c["Jwt:Secret"]).Returns("super-secret-jwt-key");
-        _configurationMock.Setup(c => c["Google:ClientId"]).Returns("google-client-id");
-        _configurationMock.Setup(c => c["Facebook:AppId"]).Returns("facebook-app-id");
 
-        _authService = new AuthService(_userRepositoryMock.Object, _emailServiceMock.Object, _configurationMock.Object, _mapperMock.Object);
+        _configurationMock.Setup(c => c["EmailSettings:SenderName"]).Returns("Valid Sender name");
+        _configurationMock.Setup(c => c["EmailSettings:SenderEmail"]).Returns("validemail@gmail.com");
+        _configurationMock.Setup(c => c["EmailSettings:SenderPassword"]).Returns("emailpassword");
+        _configurationMock.Setup(c => c["App:BaseUrl"]).Returns("https://localhost:5000");
+        _configurationMock.Setup(c => c["JWT:Key"]).Returns("justaverylongstringusuallyaguidthatcanbeusedhere");
+        _configurationMock.Setup(c => c["JWT:Issuer"]).Returns("https://localhost:5000");
+        _configurationMock.Setup(c => c["JWT:Audience"]).Returns("https://localhost:5000");
+
+        _emailServiceMock = new EmailService(_configurationMock.Object);
+        _authService = new AuthService(_userRepositoryMock, _emailServiceMock, _configurationMock.Object, _mapper);
+        _authService.RegisterAsync(_registerUserDtoMock);
+
     }
 
     [Fact]
-    public async Task CreatesUserAndSendsEmail()
+    public async Task CreatesUser()
     {
-        // Arrange
-        var dto = new RegisterUserDto("First", "Last", DateTime.UtcNow.AddYears(-30), "any", "firstlast@example.com", "Password123", "Password123");
-        var user = new User();
-        _mapperMock.Setup(m => m.Map<User>(dto)).Returns(user);
-        _userRepositoryMock.Setup(r => r.GetByEmailAsync(dto.Email)).ReturnsAsync((User)null);
-        _userRepositoryMock.Setup(r => r.CreateAsync(user)).ReturnsAsync(1);
-        _emailServiceMock.Setup(e => e.SendEmail(user, "Subject", "Content"));
+        var newUser = new RegisterUserDto("Paulo", "Weber", DateTime.UtcNow.AddYears(-30), "any", "paulo.weber@gmail.com", "123456", "123456");
+        var result = await _authService.RegisterAsync(newUser);
 
-        // Act
-        var result = await _authService.RegisterAsync(dto);
-
-        // Assert
-        _userRepositoryMock.Verify(r => r.CreateAsync(user), Times.Once());
-        _emailServiceMock.Verify(e => e.SendEmail(user, "Subject", "Content"), Times.Once());
-        Assert.Equal("User registered successfully. Please confirm your email.", result);
+        Assert.True(result);
     }
 
     [Fact]
-    public async Task UserExists_ThrowsException()
+    public async Task CreateUser_UserExists_ThrowsException()
     {
-        // Arrange
-        var dto = new RegisterUserDto("First", "Last", DateTime.UtcNow.AddYears(-30), "any", "firstlast@example.com", "Password123", "Password123");
-        var existingUser = new User { Email = dto.Email };
-        _userRepositoryMock.Setup(r => r.GetByEmailAsync(dto.Email)).ReturnsAsync(existingUser);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => _authService.RegisterAsync(dto));
-        _userRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Never());
-        _emailServiceMock.Verify(e => e.SendEmail(existingUser, "Subject", "Content"), Times.Never());
+        await Assert.ThrowsAsync<Exception>(() => _authService.RegisterAsync(_registerUserDtoMock));
     }
+
+    [Fact]
+    public async Task ConfirmUserEmail()
+    {
+        var user = await _userRepositoryMock.GetByEmailAsync(_registerUserDtoMock.Email);
+        var result = await _authService.ConfirmEmailAsync(new ConfirmEmailDto(user.Email, user.EmailConfirmationCode));
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task Login()
+    {
+        LoginDto login = new LoginDto(_registerUserDtoMock.Email, _registerUserDtoMock.Password, false);
+        var result = await _authService.LoginAsync(login);
+        Assert.True(!string.IsNullOrEmpty(result)); 
+    }
+
+    [Fact]
+    public async Task Login_Fail_ThrowsException()
+    {
+        LoginDto login = new LoginDto(_registerUserDtoMock.Email, new Guid().ToString(), false);
+        await Assert.ThrowsAsync<Exception>(() => _authService.LoginAsync(login));
+    }
+
 
 }
