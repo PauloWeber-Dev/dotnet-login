@@ -1,0 +1,319 @@
+{
+	"info": {
+		"_postman_id": "31c9764a-39f0-4c7a-8a23-5db327592ebc",
+		"name": "Login Net API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "46356963",
+		"_collection_link": "https://pauloweber-2702935.postman.co/workspace/Paulo-Weber's-Workspace~34d91537-8198-4a89-8cce-98e823f44257/collection/46356963-31c9764a-39f0-4c7a-8a23-5db327592ebc?action=share&source=collection_link&creator=46356963"
+	},
+	"item": [
+		{
+			"name": "Register new User",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"firstName\": \"Paulo\",\r\n  \"lastName\": \"Weber\",\r\n  \"birthDate\": \"1972-05-10T00:00:00.000Z\",\r\n  \"gender\": \"male\",\r\n  \"email\": \"paulo.weber@gmail.com\",\r\n  \"password\": \"123456\",\r\n  \"confirmPassword\": \"123456\",\r\n  \"externalLogin\": false,\r\n  \"googleId\": \"\",\r\n  \"facebookId\": \"\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{login-api-url}}/register",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Confirm Email",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 200\", function () {\r",
+							"    pm.expect(pm.response.code).to.equal(200);\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Response time is less than 200ms\", function () {\r",
+							"    pm.expect(pm.response.responseTime).to.be.below(200);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"email\": \"paulo.weber@gmail.com\",\r\n    \"code\": \"9mqtASRQ0jYhv9M2WcOTpy+buPIRnnnN1kHGcGhhsFo=\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{login-api-url}}/confirm-email",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"confirm-email"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"email\": \"paulo.weber@gmail.com\",\r\n  \"password\": \"654321\",\r\n  \"rememberMe\": false\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{login-api-url}}/login",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Forgot Email",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{login-api-url}}/forgot-password?email=paulo.weber@gmail.com",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"forgot-password"
+					],
+					"query": [
+						{
+							"key": "email",
+							"value": "paulo.weber@gmail.com"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reset Password",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"email\": \"paulo.weber@gmail.com\",\r\n  \"password\": \"123456\",\r\n  \"rememberMe\": false\r\n}"
+				},
+				"url": {
+					"raw": "{{login-api-url}}/reset-password?token=HmgeXkviTqHdRhHRMSDljgDWsbiFwubqMxOkC5Lay8k=&newPassword=654321",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"reset-password"
+					],
+					"query": [
+						{
+							"key": "token",
+							"value": "HmgeXkviTqHdRhHRMSDljgDWsbiFwubqMxOkC5Lay8k="
+						},
+						{
+							"key": "newPassword",
+							"value": "654321"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Enable MFA",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"email\": \"paulo.weber@gmail.com\",\r\n  \"password\": \"123456\",\r\n  \"rememberMe\": false\r\n}"
+				},
+				"url": {
+					"raw": "{{login-api-url}}/enable-mfa?email=paulo.weber@gmail.com",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"enable-mfa"
+					],
+					"query": [
+						{
+							"key": "email",
+							"value": "paulo.weber@gmail.com"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Verify MFA",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"email\": \"paulo.weber@gmail.com\",\r\n  \"code\" : \"251143\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{login-api-url}}/verify-mfa",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"verify-mfa"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Change User to Admin",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"firstName\": \"Paulo\",\r\n  \"lastName\": \"Weber\",\r\n  \"birthDate\": \"1972-05-10T00:00:00.000Z\",\r\n  \"gender\": \"male\",\r\n  \"email\": \"paulo.weber@gmail.com\",\r\n  \"password\": \"123456\",\r\n  \"confirmPassword\": \"123456\",\r\n  \"externalLogin\": false,\r\n  \"googleId\": \"\",\r\n  \"facebookId\": \"\"\r\n}"
+				},
+				"url": {
+					"raw": "{{login-api-url}}/set-admin?userId=1",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"set-admin"
+					],
+					"query": [
+						{
+							"key": "userId",
+							"value": "1"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Change User Status",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"firstName\": \"Paulo\",\r\n  \"lastName\": \"Weber\",\r\n  \"birthDate\": \"1972-05-10T00:00:00.000Z\",\r\n  \"gender\": \"male\",\r\n  \"email\": \"paulo.weber@gmail.com\",\r\n  \"password\": \"123456\",\r\n  \"confirmPassword\": \"123456\",\r\n  \"externalLogin\": false,\r\n  \"googleId\": \"\",\r\n  \"facebookId\": \"\"\r\n}"
+				},
+				"url": {
+					"raw": "{{login-api-url}}/change-status?userId=1&status=0",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"change-status"
+					],
+					"query": [
+						{
+							"key": "userId",
+							"value": "1"
+						},
+						{
+							"key": "status",
+							"value": "0"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Check Claims",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJwYXVsby53ZWJlckBnbWFpbC5jb20iLCJqdGkiOiJkN2M0NGQ2Mi04MjRkLTRkN2MtYjkwNy0wZmM2YmE2MzQ0MDkiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOlsidXNlciIsImFkbWluIl0sImV4cCI6MTc1NTExNDEyMSwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6Imh0dHBzOi8vbG9jYWxob3N0OjUwMDEifQ.kyyDIfQHLqqaC92LLIfE1ojb8DSQugdSy-oIaOJ2zgY",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"firstName\": \"Paulo\",\r\n  \"lastName\": \"Weber\",\r\n  \"birthDate\": \"1972-05-10T00:00:00.000Z\",\r\n  \"gender\": \"male\",\r\n  \"email\": \"paulo.weber@gmail.com\",\r\n  \"password\": \"123456\",\r\n  \"confirmPassword\": \"123456\",\r\n  \"externalLogin\": false,\r\n  \"googleId\": \"\",\r\n  \"facebookId\": \"\"\r\n}"
+				},
+				"url": {
+					"raw": "{{login-api-url}}/claims",
+					"host": [
+						"{{login-api-url}}"
+					],
+					"path": [
+						"claims"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

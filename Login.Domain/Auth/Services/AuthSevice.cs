@@ -35,13 +35,13 @@ public class AuthService : IAuthService
         _emailService = emailService;
     }
 
-    public async Task<string> RegisterAsync(RegisterUserDto dto)
+    public async Task<bool> RegisterAsync(RegisterUserDto dto)
     {
         try
         {
             var existingUser = await _userRepository.GetByEmailAsync(dto.Email);
             if (existingUser != null)
-                throw new Exception("Email existe");
+                throw new Exception("Email exists");
 
 
             var user = _mapper.Map<User>(dto);
@@ -50,15 +50,36 @@ public class AuthService : IAuthService
 
             user.EmailConfirmationCode = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
+            user.EmailConfirmationCodeExpiry = DateTime.UtcNow.AddDays(2);
+
+            user.UserRoles = new List<string> { "user" };
+
+            user.Status = UserStatus.Registered;
+
+            if (dto.ExternalLogin == true)
+            {
+                if (!string.IsNullOrEmpty(dto.GoogleId))
+                {
+                    user.GoogleId = dto.GoogleId;
+                }
+                else if (!string.IsNullOrEmpty(dto.FacebookId))
+                {
+                    user.FacebookId = dto.FacebookId;
+                }
+            }
+            else
+            {
+                user.GoogleId = null;
+                user.FacebookId = null;
+            }
+
             await _userRepository.CreateAsync(user);
 
             string confirmationLink = $"{_configuration["App:BaseUrl"]}/confirm-email?email={Uri.EscapeDataString(user.Email)}&code={Uri.EscapeDataString(user.EmailConfirmationCode)}";
 
             string emailContent = EmailTemplateHelper.GetConfirmEmailTemplate(confirmationLink, user);
 
-            _emailService.SendEmail(user, "Confirme seu email", emailContent);
-
-            return "Operação realizada com sucesso. Um email de confirmação foi enviado para o seu endereço de email.";
+            return await _emailService.SendEmail(user, "Confirm your email", emailContent);
 
         }
         catch (Exception)
@@ -74,18 +95,24 @@ public class AuthService : IAuthService
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             throw new Exception("Invalid credentials");
 
-        return await GenerateJwtToken(user);
+        ValidateUserStatus(user);
+
+        if(user.MfaSecretKey != null)
+           return "MFA";
+
+        return GenerateJwtToken(user, dto.RememberMe);
     }
 
     public async Task RequestPasswordResetAsync(string email)
     {
         var user = await _userRepository.GetByEmailAsync(email);
         if (user == null)
-            return; 
+            return;
 
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         user.ResetToken = token;
         user.ResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+        user.Status = UserStatus.PasswordResetRequested;
         await _userRepository.UpdateAsync(user);
         await SendResetEmail(user);
     }
@@ -99,54 +126,73 @@ public class AuthService : IAuthService
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
         user.ResetToken = null;
         user.ResetTokenExpiry = null;
+        user.Status = UserStatus.Active; // Reset status to active after password reset
         await _userRepository.UpdateAsync(user);
-        
+
     }
 
-    private async Task<string> GenerateJwtToken(User user) => await Task.Run(() =>
-                                                                   {
-                                                                       if (user == null)
-                                                                           throw new ArgumentNullException(nameof(user), "User cannot be null");
+    private string GenerateJwtToken(User user, bool rememberMe = false)
+    {
+        if (user == null)
+            throw new ArgumentNullException(nameof(user), "User cannot be null");
 
-                                                                       var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-                                                                       var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Key"]));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-                                                                       var claims = new[]
-                                                                       {
-                                                                            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                                                                            new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                                                                            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-                                                                        };
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, user.Email),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+        };
 
-                                                                       var token = new JwtSecurityToken(
-                                                                           issuer: _configuration["Jwt:Issuer"],
-                                                                           audience: _configuration["Jwt:Audience"],
-                                                                           claims: claims,
-                                                                           expires: DateTime.Now.AddHours(1),
-                                                                           signingCredentials: creds);
+        if (user.UserRoles != null && user.UserRoles.Count > 0)
+        {
+            foreach (var role in user.UserRoles)
+            {
+                claims = claims.Append(new Claim(ClaimTypes.Role, role)).ToArray();
+            }
+        }
+        else
+        {
+            claims = claims.Append(new Claim(ClaimTypes.Role, "user")).ToArray();
+        }
 
-                                                                       return new JwtSecurityTokenHandler().WriteToken(token);
-                                                                   });
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = rememberMe ? DateTime.UtcNow.AddYears(1) : DateTime.UtcNow.AddHours(1),
+            Issuer = _configuration["JWT:Issuer"],
+            Audience = _configuration["JWT:Audience"],
+            SigningCredentials = creds
+        };
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+
+        return tokenHandler.WriteToken(token);
+    }
 
     #region Email Confirmation
     private async Task SendResetEmail(User user)
     {
         string resetLink = $"{_configuration["App:BaseUrl"]}/reset-password?token={user.ResetToken}";
         string emailBody = EmailTemplateHelper.GetResetEmailTemplate(resetLink, user);
-        _emailService.SendEmail(user, "Password Reset Request", emailBody);
+        await _emailService.SendEmail(user, "Password Reset Request", emailBody);
 
     }
 
-    public async Task <bool> ConfirmEmailAsync(ConfirmEmailDto dto)
+    public async Task<bool> ConfirmEmailAsync(ConfirmEmailDto dto)
     {
         var user = await _userRepository.GetByEmailAsync(dto.Email);
         if (user == null || user.EmailConfirmationCode != dto.Code || user.EmailConfirmationCodeExpiry < DateTime.UtcNow)
             throw new Exception("Confirmation token invalid or expired");
 
-        user.IsEmailConfirmed = true;
+        user.Status = UserStatus.Active;
         user.EmailConfirmationCode = null; // Clear the token after confirmation
+        user.EmailConfirmationCodeExpiry = null; // Clear the expiry date
         await _userRepository.UpdateAsync(user);
-        return user.IsEmailConfirmed;
+        return true;
     }
     #endregion
 
@@ -161,37 +207,19 @@ public class AuthService : IAuthService
 
     public async Task<string> GoogleLoginAsync(string googleToken)
     {
-        // Validate the Google token
-        var payload = await GoogleJsonWebSignature.ValidateAsync(googleToken);
-        if (payload == null)
-            throw new Exception("Invalid Google token");
-        // Check if user already exists
-        var user = await _userRepository.GetByGoogleIdAsync(payload.Subject);
-        if (user == null)
-        {
-            // Create a new user if not found
-            user = new User
-            {
-                FirstName = payload.GivenName,
-                LastName = payload.FamilyName,
-                Email = payload.Email,
-                GoogleId = payload.Subject
-            };
-            await _userRepository.CreateAsync(user);
-        }
-        return await GenerateJwtToken(user);
+        throw new NotImplementedException();
     }
 
     #endregion
 
     #region MFA
-    public async Task<string> EnableMfaAsync(EnableMfaDto dto)
+    public async Task<string> EnableMfaAsync(string email)
     {
-        var user = await _userRepository.GetByIdAsync(dto.UserId);
+        var user = await _userRepository.GetByEmailAsync(email);
         if (user == null)
-            throw new Exception("User not found");
-        if (!user.IsEmailConfirmed)
-            throw new Exception("Email not confirmed");
+            return string.Empty;
+
+        ValidateUserStatus(user);
 
         var secretKey = KeyGeneration.GenerateRandomKey(20);
         user.MfaSecretKey = Base32Encoding.ToString(secretKey);
@@ -213,16 +241,66 @@ public class AuthService : IAuthService
         if (!totp.VerifyTotp(dto.Code, out _, new VerificationWindow(2)))
             throw new Exception("Invalid MFA code");
 
-        return await GenerateJwtToken(user);
+        return GenerateJwtToken(user);
     }
 
-    public async Task<string> GetLatestTOU() => await Task.Run(() => { return "Terms of Use content goes here. This should be fetched from a database or a file."; });
 
 
-    public async Task<string> GetLatestPP() => await Task.Run(() => {return "Privacy Policy content goes here. This should be fetched from a database or a file."; });
-      
+
 
 
     #endregion
+
+    #region TOU and PP
+    public async Task<string> GetLatestTOU() => await Task.Run(() => { return "Terms of Use content goes here. This should be fetched from a database or a file."; });
+
+
+    public async Task<string> GetLatestPP() => await Task.Run(() => { return "Privacy Policy content goes here. This should be fetched from a database or a file."; });
+    #endregion
+
+    #region Admin Management
+
+    // Sets the user as an admin
+    //TODO: Implement proper role management and permissions
+    //TODO: This should be set in a separate admin management service, but for simplicity, it's included here
+    public async Task<bool> SetAdmin(int userId)
+    {
+        var user = _userRepository.GetByIdAsync(userId).Result;
+        if (user == null)
+            throw new Exception("User not found");
+        ValidateUserStatus(user);
+        if (user.UserRoles == null) user.UserRoles = new List<string>();
+        user.UserRoles.Add("admin");
+        user.Status = UserStatus.Active; // Ensure user is active
+        return await _userRepository.UpdateAsync(user).ContinueWith(t => t.IsCompletedSuccessfully);
+    }
+
+
+    public async Task<bool> SetStatus(int userId, UserStatus status)
+    {
+        var user = _userRepository.GetByIdAsync(userId).Result;
+        if (user == null)
+            throw new Exception("User not found");
+        user.Status = status;
+        return await _userRepository.UpdateAsync(user).ContinueWith(t => t.IsCompletedSuccessfully);
+    }
+    #endregion
+
+    private void ValidateUserStatus(User user)
+    {
+        switch (user.Status)
+        {
+            case UserStatus.Registered:
+                throw new Exception("Email not confirmed");
+            case UserStatus.PasswordResetRequested:
+                throw new Exception("Password reset requested, please reset your password");
+            case UserStatus.Inactive:
+                throw new Exception("User is inactive, please contact support");
+            case UserStatus.Deleted:
+                throw new Exception("User is deleted, please contact support");
+            default: break;
+        }
+    }
+
 }
 

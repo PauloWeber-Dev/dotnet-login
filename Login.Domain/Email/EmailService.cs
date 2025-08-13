@@ -14,7 +14,7 @@ namespace Domain.Email
         {
             _configuration = configuration;
         }
-        public void SendEmail(User user, string subject, string body)
+        public async Task<bool> SendEmail(User user, string subject, string body)
         {
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(_configuration["EmailSettings:SenderName"]!,_configuration["EmailSettings:SenderEmail"]!));
@@ -25,14 +25,24 @@ namespace Domain.Email
             {
                 Text = body
             };
-
-            using (var client = new SmtpClient())
+            try
             {
-                client.Connect("smtp.gmail.com", 587, SecureSocketOptions.StartTls);
-                client.Authenticate(_configuration["EmailSettings:SenderEmail"]!, _configuration["EmailSettings:SenderPassword"]!);
-                client.Send(message);
-                client.Disconnect(true);
+                using (var client = new SmtpClient())
+                {
+
+                    client.Connect("smtp.gmail.com", 587, SecureSocketOptions.StartTls);
+                    client.Authenticate(_configuration["EmailSettings:SenderEmail"]!, _configuration["EmailSettings:SenderPassword"]!);
+                    await client.SendAsync(message);
+                    client.Disconnect(true);
+                }
+                return true;
             }
+            catch (Exception)
+            {
+
+                throw;
+            }
+
         }
     }
 }

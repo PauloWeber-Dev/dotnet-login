@@ -14,13 +14,14 @@ namespace Login.Domain.Helpers
             return $@"
                 <html>
                 <body>
-                    <h1>Solicitação de redefinição de senha</h1>
-                    <p>Caro {user.FirstName} {user.LastName},</p>
-                    <p>Recebemos uma solicitação para alterar seu email. Para prosseguirmos com sua solicitação, clique no link abaixo:</p>
-                    <a href='{resetLink}'>Redefinir senha</a>
-                    <p>Ou copie e cole o texto abaixo no seu navegador:</p>
+                    <h1>Password reset request</h1>
+                    <p>Dear {user.FirstName} {user.LastName},</p>
+                    <p>We received a password reset request for your account. Click on the link below to proceed:</p>
+                    <a href='{resetLink}'>Reset password</a>
+                    <p>Or copy the URL below and paste it in a browser window:</p>
                     <p>{resetLink}</p>
-                    <p>Se você não fez essa solicitação, entre em contato conosco.</p>
+                    <p>If you did not make this request, please contact us.</p>
+                    <p>FOR YOUR SECURITY, THIS LINK WILL EXPIRE IN 1 HOUR.</p>
                 </body>
                 </html>";
         }
@@ -30,12 +31,22 @@ namespace Login.Domain.Helpers
             return $@"
                 <html>
                 <body>
-                    <h1>Confirmação de Email</h1>
-                    <p>Caro {user.FirstName} {user.LastName},</p>
-                    <p>Obrigado por efetuar seu registro. Para confirmar seu email clique no link abaixo:</p>
-                    <a href='{confirmEmailLink}'>Confirmar email</a>
-                    <p>Ou copie e cole o texto abaixo no seu navegador:</p>
+                    <h1>Email confirmation</h1>
+                    <p>Dear {user.FirstName} {user.LastName},</p>
+                    <p>Thank you for registering with us.To confirm you email, click the link below:</p>
+                    <a href='{confirmEmailLink}'>Confirm email</a>
+                    <p>Or copy the URL below and paste it in a browser window:</p>
                     <p>{confirmEmailLink}</p>
+                    <p>If you did not make this request, please contact us.</p>
+                    <p>FOR YOUR SECURITY, THIS LINK WILL EXPIRE IN 2 DAYS.</p>
+                    <p>Thank you!</p>
+                    <p>FOR TESTING PURPOSES, SWAGGER JSON</p>
+                    <pre>
+                    {{
+                        ""email"": ""{user.Email}"",
+                        ""code"": ""{user.EmailConfirmationCode}""
+                    }}
+                    </pre>
                 </body>
                 </html>";
         }

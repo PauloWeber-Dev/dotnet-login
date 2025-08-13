@@ -9,6 +9,6 @@ namespace Domain.Email
 {
     public interface IEmailService
     {
-        void SendEmail(User user, string subject, string body);
+        Task<bool> SendEmail(User user, string subject, string body);
     }
 }

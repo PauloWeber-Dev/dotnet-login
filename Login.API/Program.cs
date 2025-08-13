@@ -1,25 +1,77 @@
 using Domain.Auth;
-using DTO.Auth;
 using Domain.Auth.Services;
-using Domain.Repository;
 using Domain.Email;
+using Domain.Repository;
+using DTO.Auth;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Repository.Auth;
+using Serilog;
 using System.Reflection;
+using System.Text;
+//Uncomment the following lines to use EntityFramework
+using Login.Repository;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
+// Uncomment the following line to use Dapper with SQL Server
+//builder.Services.AddScoped<IUserRepository, UserRepositoryDapper>();
+// Uncomment the following line to use Entity Framework with SQL Server
+builder.Services.AddScoped<IUserRepository, UserRepositoryEF>().AddDbContext<LoginDbContext>(options =>
+    options.UseSqlServer(builder.Configuration["Database:ConnectionString"]!));
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddAutoMapper(Assembly.Load("Login.Domain"));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddSwaggerGen(options =>
     {
-        c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "Login API", Version = "v1" });
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Description = "JWT Authorization header using the Bearer scheme. Example: 'Bearer {token}'",
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
+        });
+
+        // Require JWT for protected endpoints
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+        options.SwaggerDoc("v1", new OpenApiInfo { Title = "Login API", Version = "v1" });
     });
 builder.Services
-    .AddAuthentication()
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["JWT:Issuer"],
+            ValidAudience = builder.Configuration["JWT:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"]))
+        };
+    })
     .AddGoogle(options =>
     {
         options.ClientId = builder.Configuration["Google:ClientId"];
@@ -30,14 +82,28 @@ builder.Services
         options.AppSecret = builder.Configuration["Facebook:AppSecret"];
     });
 
+builder.Services.AddAuthorizationBuilder()
+  .AddPolicy("admin_login", policy =>
+        policy
+            .RequireRole("admin"));
 
+// Configure Serilog for logging
+builder.Host.UseSerilog((context, config) =>
+{
+    config
+        .WriteTo.Console()
+        .WriteTo.File("logs/app.log", rollingInterval: RollingInterval.Day)
+        .MinimumLevel.Information();
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
-app.UseAuthentication();
 
-if(app.Environment.IsDevelopment())
+app.UseAuthentication();
+app.UseAuthorization();
+
+//Setup Swagger
+if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
     app.UseSwagger();
@@ -45,37 +111,40 @@ if(app.Environment.IsDevelopment())
 }
 else
 {
-    // For production, you might want to use a more robust error handling middleware
+    // TODO: Configure production error handling
     app.UseExceptionHandler("/error");
 }
 // Endpoints
-app.MapPost("/register", async (RegisterUserDto dto, IAuthService authService) =>
+app.MapPost("/register", async (RegisterUserDto dto, IAuthService authService, ILogger<Program> logger) =>
 {
     try
     {
         var message = await authService.RegisterAsync(dto);
-        return Results.Ok(new { message });
+        logger.LogInformation("User registered: {Email}", dto.Email);
+        return Results.Ok();
     }
     catch (Exception ex)
     {
+        logger.LogError(ex, "Error registering user: {Email}", dto.Email);
         return Results.BadRequest(ex.Message);
     }
 });
 
-app.MapPost("/confirm-email", async (ConfirmEmailDto dto, IAuthService authService) =>
+app.MapPost("/confirm-email", async (ConfirmEmailDto dto, IAuthService authService, ILogger<Program> logger) =>
 {
     try
     {
         var message = await authService.ConfirmEmailAsync(dto);
-        return Results.Ok(new { message });
+        return Results.Ok();
     }
     catch (Exception ex)
     {
+        logger.LogError(ex, "Error confirming email: {Email}", dto.Email);
         return Results.BadRequest(ex.Message);
     }
 });
 
-app.MapPost("/login", async (LoginDto dto, IAuthService authService) =>
+app.MapPost("/login", async (LoginDto dto, IAuthService authService, ILogger<Program> logger) =>
 {
     try
     {
@@ -84,11 +153,13 @@ app.MapPost("/login", async (LoginDto dto, IAuthService authService) =>
     }
     catch (Exception ex)
     {
+        logger.LogError(ex, "Error logging in user: {Email}", dto.Email);
         return Results.BadRequest(ex.Message);
     }
 });
 
-app.MapPost("/google-login", async (string googleToken, IAuthService authService) =>
+//TODO: Implement service
+app.MapPost("/google-login", async (string googleToken, IAuthService authService, ILogger<Program> logger) =>
 {
     try
     {
@@ -97,11 +168,13 @@ app.MapPost("/google-login", async (string googleToken, IAuthService authService
     }
     catch (Exception ex)
     {
+        logger.LogError(ex, "Error logging in with Google token");
         return Results.BadRequest(ex.Message);
     }
 });
 
-app.MapPost("/facebook-login", async (string facebookToken, IAuthService authService) =>
+//TODO: Implement service
+app.MapPost("/facebook-login", async (string facebookToken, IAuthService authService, ILogger<Program> logger) =>
 {
     try
     {
@@ -110,50 +183,58 @@ app.MapPost("/facebook-login", async (string facebookToken, IAuthService authSer
     }
     catch (Exception ex)
     {
+        logger.LogError(ex, "Error logging in with Facebook token");
         return Results.BadRequest(ex.Message);
     }
 });
 
-app.MapPost("/forgot-password", async (string email, IAuthService authService) =>
+app.MapPost("/forgot-password", async (string email, IAuthService authService, ILogger<Program> logger) =>
 {
     try
     {
+        logger.LogInformation("Requesting password reset for email: {Email}", email);
         await authService.RequestPasswordResetAsync(email);
-        return Results.Ok("Password reset email sent");
+        return Results.Ok();
     }
     catch (Exception ex)
     {
+        logger.LogError(ex, "Error requesting password reset for email: {Email}", email);
         return Results.BadRequest(ex.Message);
     }
 });
 
-app.MapPost("/reset-password", async (string token, string newPassword, IAuthService authService) =>
+//TODO: Password is coming in plain text, hash it before sending
+app.MapPost("/reset-password", async (string token, string newPassword, IAuthService authService, ILogger<Program> logger) =>
 {
     try
     {
+        logger.LogInformation("Resetting password with token: {Token}", token);
         await authService.ResetPasswordAsync(token, newPassword);
-        return Results.Ok("Password reset successfully");
+        return Results.Ok();
     }
     catch (Exception ex)
     {
+        logger.LogError(ex, "Error resetting password with token: {Token}", token);
         return Results.BadRequest(ex.Message);
     }
 });
 
-app.MapPost("/enable-mfa", async (EnableMfaDto dto, IAuthService authService) =>
+app.MapPost("/enable-mfa", async (string email, IAuthService authService, ILogger<Program> logger) =>
 {
     try
     {
-        var qrCodeUrl = await authService.EnableMfaAsync(dto);
+        logger.LogInformation("Enabling MFA for email: {Email}", email);
+        var qrCodeUrl = await authService.EnableMfaAsync(email);
         return Results.Ok(new { QrCodeUrl = qrCodeUrl });
     }
     catch (Exception ex)
     {
+        logger.LogError(ex, "Error enabling MFA for email: {Email}", email);
         return Results.BadRequest(ex.Message);
     }
 });
 
-app.MapPost("/verify-mfa", async (VerifyMfaDto dto, IAuthService authService) =>
+app.MapPost("/verify-mfa", async (VerifyMfaDto dto, IAuthService authService, ILogger<Program> logger) =>
 {
     try
     {
@@ -162,6 +243,40 @@ app.MapPost("/verify-mfa", async (VerifyMfaDto dto, IAuthService authService) =>
     }
     catch (Exception ex)
     {
+        logger.LogError(ex, "Error verifying MFA for email: {Email}", dto.Email);
+        return Results.BadRequest(ex.Message);
+    }
+});
+
+
+//TODO: Move this to an admin microservice (eventually)
+app.MapPost("/change-status", [Authorize(Policy = "admin_login")] async (int userId, int status, IAuthService authService, ILogger<Program> logger) =>
+{
+    try
+    {
+        logger.LogInformation("Changing user status for userId: {UserId} to status: {Status}", userId, status);
+        var token = await authService.SetStatus(userId, (UserStatus)status);
+        return Results.Ok(new { Token = token });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error changing user status for userId: {UserId}", userId);
+        return Results.BadRequest(ex.Message);
+    }
+});
+
+//TODO: Move this to an admin microservice (eventually)
+app.MapPost("/set-admin", [Authorize(Policy = "admin_login")] async (int userId, IAuthService authService, ILogger<Program> logger) =>
+{
+    try
+    {
+        logger.LogInformation("Setting admin role for userId: {UserId}", userId);
+        var token = await authService.SetAdmin(userId);
+        return Results.Ok();
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error setting admin role for userId: {UserId}", userId);
         return Results.BadRequest(ex.Message);
     }
 });

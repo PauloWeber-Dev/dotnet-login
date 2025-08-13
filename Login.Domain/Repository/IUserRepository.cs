@@ -10,5 +10,6 @@ public interface IUserRepository
     Task<User?> GetByResetTokenAsync(string token);
     Task<User?> GetByEmailConfirmationCodeAsync(string code);
     Task<int> CreateAsync(User user);
+    Task<bool> IsValidLogin(string email, string password);
     Task UpdateAsync(User user);
 }
